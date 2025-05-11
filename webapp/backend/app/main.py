@@ -8,31 +8,52 @@ from fastapi.responses import StreamingResponse
 from pydantic_ai import Agent
 from pydantic_ai.models.openai import OpenAIModel
 from pydantic_ai.providers.openai import OpenAIProvider
+from pydantic_ai.models.gemini import GeminiModel
+from pydantic_ai.providers.google_gla import GoogleGLAProvider
+from pydantic_ai.mcp import MCPServerHTTP
 
 from app.settings import Settings
 from app.models import (
     ChatRequest
 )
 
+import os
+
 settings = Settings()
 
-logfire.configure(send_to_logfire='if-token-present')
+os.environ['OTEL_EXPORTER_OTLP_TRACES_ENDPOINT'] = settings.OTEL_EXPORTER_OTLP_TRACES_ENDPOINT
+
+logfire.configure(
+        send_to_logfire=False,
+        service_name='pydantic'
+    )
+logfire.instrument_pydantic_ai()
+
+Agent.instrument_all()
 
 app = FastAPI()
 logfire.instrument_fastapi(app)
+
+server = MCPServerHTTP(url='http://localhost:5008/sse')
 
 client = openai.AsyncOpenAI(
     api_key=settings.GITHUB_MODELS_API_KEY,
     base_url=settings.GITHUB_MODELS_API_URL
 )
 
-model = OpenAIModel(
-    model_name="openai/gpt-4o-mini",
+openai_model = OpenAIModel(
+    model_name="openai/gpt-4.1",
     provider=OpenAIProvider(openai_client=client),
 )
 
+gemini_provider = GoogleGLAProvider(api_key=settings.GEMINI_API_KEY)
+
+gemini_model = GeminiModel('gemini-2.5-flash-preview-04-17', provider=gemini_provider)
+
 agent = Agent(
-    model=model
+    model=gemini_model,
+    mcp_servers=[server],
+    system_prompt="You are a generic agent that answers questions on any and all topics. You will have access to tools, but you do not need to use them, not should you limit your responses to the scope of the tools"
 )
 
 @app.post('/chat')
@@ -58,15 +79,15 @@ async def post_chat(
         0:"message part"
         s:{"model":"gpt-3.5-turbo","temperature":0.7,"top_p":1,"frequency_penalty":0,"presence_penalty":0,"stop":["\n"]}
         """
-
-        async with agent.run_stream(
-            user_prompt=chat_request.message,
-            message_history=chat_request.history
-        ) as result:
-            async for text in result.stream_text(debounce_by=0.1, delta=True):
-                yield f"0:{json.dumps(text)}\n"
+        async with agent.run_mcp_servers():
+            async with agent.run_stream(
+                user_prompt=chat_request.message,
+                message_history=chat_request.history
+            ) as result:
+                async for text in result.stream_text(debounce_by=0.1, delta=True):
+                    yield f"0:{json.dumps(text)}\n"
         
-        yield f"h:{result.all_messages_json().decode()}\n"
+            yield f"h:{result.all_messages_json().decode()}\n"
     
     return StreamingResponse(
         stream_message(),
