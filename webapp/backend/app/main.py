@@ -1,3 +1,4 @@
+import json
 from fastapi import FastAPI
 import logfire
 import openai
@@ -7,9 +8,7 @@ from fastapi.responses import StreamingResponse
 from pydantic_ai import Agent
 from pydantic_ai.models.openai import OpenAIModel
 from pydantic_ai.providers.openai import OpenAIProvider
-from pydantic_ai.messages import (
-    ModelMessage
-)
+
 from app.settings import Settings
 from app.models import (
     ChatRequest
@@ -64,10 +63,10 @@ async def post_chat(
             user_prompt=chat_request.message,
             message_history=chat_request.history
         ) as result:
-            async for text in result.stream(debounce_by=0.1):
-                yield f"0:\"{text}\"\n"
+            async for text in result.stream_text(debounce_by=0.1, delta=True):
+                yield f"0:{json.dumps(text)}\n"
         
-        yield f"h:{result.all_messages_json()}\n"
+        yield f"h:{result.all_messages_json().decode()}\n"
     
     return StreamingResponse(
         stream_message(),
@@ -100,11 +99,11 @@ async def post_mock_chat(
 
         #return a static message over 4 seconds
         async def static_message():
-            for i in range(4):
-                yield f"this is a static message part {i}"
+            for i in range(8):
+                yield f"this is a static message part {i}\n"
                 await asyncio.sleep(1)
         async for text in static_message():
-            yield f"0:\"{text}\"\n"
+            yield f"0:{json.dumps(text)}\n"
     
     return StreamingResponse(
         stream_message(),

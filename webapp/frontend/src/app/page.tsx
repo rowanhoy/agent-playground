@@ -1,103 +1,122 @@
-import Image from "next/image";
+'use client'
+import { useState, useEffect, useRef } from "react";
 
 export default function Home() {
-  return (
-    <div className="grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20 font-[family-name:var(--font-geist-sans)]">
-      <main className="flex flex-col gap-[32px] row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="list-inside list-decimal text-sm/6 text-center sm:text-left font-[family-name:var(--font-geist-mono)]">
-          <li className="mb-2 tracking-[-.01em]">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] px-1 py-0.5 rounded font-[family-name:var(--font-geist-mono)] font-semibold">
-              src/app/page.tsx
-            </code>
-            .
-          </li>
-          <li className="tracking-[-.01em]">
-            Save and see your changes instantly.
-          </li>
-        </ol>
+  const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [isError, setIsError] = useState<boolean>(false);
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [fullHistory, setHistory] = useState<JSON|null>(null);
+  const [message, setMessage] = useState<string>("");
+  const bottomRef = useRef<HTMLDivElement | null>(null);
 
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:w-auto"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 w-full sm:w-auto md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
-        </div>
-      </main>
-      <footer className="row-start-3 flex gap-[24px] flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
+  useEffect(() => {
+    if (bottomRef.current) {
+      bottomRef.current.scrollIntoView({ behavior: "smooth" });
+    }
+  }, [messages]);
+
+  interface Message {
+    role: string;
+    content: string;
+  }
+
+  //post chat message on send press
+  //stream the response and append it to the last message
+  const handleSend = async () => {
+    if (message.trim() === "") return;
+    const newMessage: Message = {
+      role: "user",
+      content: message,
+    };
+    setMessages(prev => [...prev, newMessage]);
+    setMessage("");
+    setIsLoading(true);
+    setIsError(false);
+    try {
+      const response = await fetch("/api/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ message: message, history: fullHistory }),
+      });
+      if (!response.ok) {
+        throw new Error("Network response was not ok");
+      }
+      const reader = response.body!.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+      while (true) {
+        const { value, done } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split("\n");
+        buffer = lines.pop()!;
+        for (const line of lines) {
+          if (!line) continue;
+          const prefix = line[0];
+          const content = line.slice(2);
+          try {
+            if (prefix === "0") {
+                const parsedContent = JSON.parse(content);
+                console.log("Parsed content:", parsedContent);
+                setMessages(prevMessages => {
+                    if (prevMessages.length > 0 && prevMessages[prevMessages.length - 1].role === 'assistant') {
+                      // Create a completely new array with a new message object at the end
+                      return [
+                        ...prevMessages.slice(0, -1),
+                        {
+                          role: 'assistant',
+                          content: prevMessages[prevMessages.length - 1].content + parsedContent
+                        }
+                      ];
+                    } else {
+                      return [...prevMessages, { role: 'assistant', content: parsedContent }];
+                    }
+                  });
+            } else if (prefix === "h") {
+              const history = JSON.parse(content);
+              setHistory(history);
+            } else {
+              console.log(prefix, JSON.parse(content));
+            }
+          } catch (err) {
+            console.error(err);
+          }
+        }
+      }
+    } catch (error) {
+      console.error(error);
+      setIsError(true);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  return (
+    <div className="flex flex-col h-full items-center p-4">
+      <div className="flex-1 flex-col w-11/12 overflow-auto space-y-4">
+        {messages.map((msg, index) => (
+          <div key={index} className={`chat ${msg.role === 'user' ? 'chat-start' : 'chat-end'}`}>
+            <div className="chat-bubble whitespace-pre-wrap">{msg.content}</div>
+          </div>
+        ))}
+        <div ref={bottomRef} />
+      </div>
+      <form 
+        className="flex h-1/12 w-11/12 flex-row space-x-1" 
+        onSubmit={e => {
+          e.preventDefault();
+          if (!isLoading) handleSend();
+        }}
+      >
+        <input 
+          type="text" 
+          placeholder="Ask me anything" 
+          className="input w-full" 
+          value={message} 
+          onChange={(e) => setMessage(e.target.value)} 
+        />
+        <button type="submit" disabled={isLoading} className="btn btn-primary">Send</button>
+      </form>
     </div>
   );
 }

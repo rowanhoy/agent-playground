@@ -1,6 +1,9 @@
 from pydantic import BaseModel
 from typing import Optional
+from pydantic_ai.messages import (
+    ModelMessage
+)
 
 class ChatRequest(BaseModel):
     message: str
-    history: Optional[list[str] | None] = None
+    history: Optional[list[ModelMessage] | None] = None

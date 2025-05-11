@@ -3,7 +3,10 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev --turbopack",
+    "backend-dev": "uv run --directory ../backend uvicorn app.main:app --reload",
+    "frontend-dev": "next dev --turbopack",
+    "proxy-dev": "node proxy.mjs",
+    "dev": "concurrently --kill-others-on-fail \"npm run backend-dev\" \"npm run frontend-dev\" \"npm run proxy-dev\"",
     "build": "next build",
     "start": "next start",
     "lint": "next lint"
@@ -23,6 +26,8 @@
     "daisyui": "^5.0.35",
     "eslint": "^9",
     "eslint-config-next": "15.3.1",
+    "express": "^5.1.0",
+    "http-proxy-middleware": "^3.0.5",
     "tailwindcss": "^4",
     "typescript": "^5"
   }
