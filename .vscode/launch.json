@@ -1,0 +1,43 @@
+{
+    "configurations": [
+        {
+            "name": "backend",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "uvicorn",
+            "args": [
+                "app.main:app",
+                "--reload"
+            ],
+            "cwd": "/workspaces/agent-playground/webapp/backend",
+            "python": "/workspaces/agent-playground/webapp/backend/.venv/bin/python3",
+            "envFile": ".env",
+            "jinja": true,
+            "justMyCode": false
+        },
+        {
+            "name": "frontend",
+            "type": "node-terminal",
+            "request": "launch",
+            "command": "pnpm run frontend-dev",
+            "cwd": "/workspaces/agent-playground/webapp/frontend",
+        },
+        {
+            "name": "proxy",
+            "type": "node-terminal",
+            "request": "launch",
+            "command": "pnpm run proxy-dev",
+            "cwd": "/workspaces/agent-playground/webapp/frontend",
+        }
+    ],
+    "compounds": [
+        {
+            "name": "Run All",
+            "configurations": [
+                "backend",
+                "frontend",
+                "proxy"
+            ]
+        }
+    ]
+}
