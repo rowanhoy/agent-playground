@@ -73,17 +73,12 @@ async def post_chat(
         s:{"model":"gpt-3.5-turbo","temperature":0.7,"top_p":1,"frequency_penalty":0,"presence_penalty":0,"stop":["\n"]}
         """
         async with agent.run_mcp_servers():
-            result = await agent.run(
+            async with agent.run_stream(
                 user_prompt=chat_request.message,
                 message_history=chat_request.history
-            )
-            yield f"0:{json.dumps(result.output)}\n"
-            # async with agent.run_stream(
-            #     user_prompt=chat_request.message,
-            #     message_history=chat_request.history
-            # ) as result:
-            #     async for text in result.stream_text(debounce_by=0.1, delta=True):
-            #         yield f"0:{json.dumps(text)}\n"
+            ) as result:
+                async for text in result.stream_text(debounce_by=0.1, delta=True):
+                    yield f"0:{json.dumps(text)}\n"
         
             yield f"h:{result.all_messages_json().decode()}\n"
     
