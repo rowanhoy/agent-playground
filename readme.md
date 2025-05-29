@@ -16,7 +16,7 @@ docker run --rm --name jaeger \
 
 The Jaeger UI should now be accessible on port 16686 to review telemetery
 
-4. Copy the .env.example file into .env and fill in the required keys
+4. Copy the .env.example file into .env and fill in the required keys. Gemini keys can be generated at https://aistudio.google.com/ with a generous free tier.
 5. Start the frontend and backend with either vscode debug "run all" or with the below without debugging.
 ```bash
 cd webapp/frontend
