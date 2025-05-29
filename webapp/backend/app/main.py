@@ -79,8 +79,7 @@ async def post_chat(
             ) as result:
                 async for text in result.stream_text(debounce_by=0.1, delta=True):
                     yield f"0:{json.dumps(text)}\n"
-        
-            yield f"h:{result.all_messages_json().decode()}\n"
+                yield f"h:{result.all_messages_json().decode()}\n"
     
     return StreamingResponse(
         stream_message(),
